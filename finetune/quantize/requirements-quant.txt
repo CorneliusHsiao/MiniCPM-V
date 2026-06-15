@@ -1,0 +1,27 @@
+# Extra dependencies for the quantization toolkit.
+#
+# !!! IMPORTANT - read before installing !!!
+# This must NOT upgrade the pinned finetune stack (torch==2.2.0,
+# transformers==4.51.2, numpy==1.26.4). Installing GPTQ/AWQ with their
+# dependency trees WILL pull torch>=2.6 / transformers 5 / numpy 2 and break the
+# environment (and the MiniCPM-o remote code + flash-attn 2.5.8). So:
+#   * A1 + C1 deps are safe and pinned below -> install this file normally.
+#   * B1 + B2 deps are NOT in this file; install them with --no-deps only (see
+#     the "B1/B2" note in README.md), or run B1/B2 in a separate environment.
+#
+# Install (into the finetune env) with:
+#   pip install --no-cache-dir -r quantize/requirements-quant.txt
+
+# --- A1 (bitsandbytes NF4/int8) and C1 (QLoRA) -------------------------------
+# 0.43.x is built for CUDA 12.1 and works with torch 2.2.0. Do NOT use >= here.
+bitsandbytes==0.43.1
+# peft (C1) is already pinned in finetune/requirements.txt (peft==0.14.0).
+
+# --- B1 (GPTQ) / B2 (AWQ): DO NOT install from this file --------------------
+# Their current releases force torch>=2.6 / transformers>=5 and will break the
+# finetune env. If you need them in-place, try torch-2.2-compatible wheels with
+# --no-deps and verify they import (no guarantee against transformers 4.51 API):
+#   pip install --no-cache-dir --no-deps "auto-gptq==0.7.1"
+#   pip install --no-cache-dir --no-deps "autoawq==0.2.5" "autoawq-kernels"
+# Otherwise run B1/B2 in a dedicated env on a newer torch/transformers and copy
+# the resulting artifacts back for evaluation.

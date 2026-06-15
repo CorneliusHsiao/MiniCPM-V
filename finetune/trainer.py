@@ -7,7 +7,30 @@ from transformers.trainer_pt_utils import nested_detach
 from transformers.utils import is_sagemaker_mp_enabled
 from transformers.trainer import *
 from transformers.integrations import is_deepspeed_zero3_enabled
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union, Any
+
+# Compatibility shim: transformers >= 4.x calls `optimizer.train()` / `optimizer.eval()`
+# (hooks for schedule-free optimizers) inside the training/eval loop. DeepSpeed's ZeRO
+# optimizers don't implement these methods, and accelerate <= 0.30 forwards the call
+# unconditionally, raising `AttributeError: 'DeepSpeedZeroOptimizer_Stage3' object has no
+# attribute 'eval'` at the first evaluation. We need the older DeepSpeed/accelerate pins
+# for torch 2.2, so guard the calls here instead of upgrading. This is applied at import
+# time (finetune.py imports this module) and avoids patching installed library code.
+from accelerate.optimizer import AcceleratedOptimizer as _AcceleratedOptimizer
+
+
+def _safe_optimizer_train(self):
+    if hasattr(self.optimizer, "train") and callable(getattr(self.optimizer, "train")):
+        return self.optimizer.train()
+
+
+def _safe_optimizer_eval(self):
+    if hasattr(self.optimizer, "eval") and callable(getattr(self.optimizer, "eval")):
+        return self.optimizer.eval()
+
+
+_AcceleratedOptimizer.train = _safe_optimizer_train
+_AcceleratedOptimizer.eval = _safe_optimizer_eval
 
 class CPMTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
